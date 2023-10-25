@@ -1,0 +1,65 @@
+body {
+    width: 100%;
+    max-width: 1000px;
+    margin: 50px 0;
+    font-family: 'Source Sans Pro', sans-serif;
+    font-size: 18px;
+    font-weight: 300;
+    background-color:#fffcfa;
+}
+
+h1 { font-weight: 300; font-size: 48px; margin: 0 0 10px 0; }
+h2 { font-weight: 300; font-size: 32px; margin: 0 0 6px 0; }
+h3 { font-weight: 300; font-size: 24px; margin: 0 0 6px 0; }
+
+/*a { text-decoration: none; color: #ff8c00; }*/
+
+div.sidebar { width: 200px; float: left; vertical-align: top; margin-left: 50px; }
+div.main { vertical-align: top; margin-left: 300px; margin-right: 50px; }
+
+div.picture { margin: 15px 0; }
+div.contact { font-size: 16px; }
+div.name { }
+div.pub { margin: 12px 0; }
+
+div.contact dt { margin-top: 20px; color: #ff8c00; }
+div.contact dd { margin-left: 0;}
+
+div.lastupdated { font-size: 12px; }
+
+.smallbutton {
+    position: relative;
+    -webkit-border-radius: 3px; -moz-border-radius: 3px; border-radius: 3px;
+    padding: 0px 5px 0px 5px;
+    border: solid 1px #ff8c00;
+    color: #ff8c00;
+    font-size: 14px;
+    text-decoration: none;
+    margin: 0px 2px;
+}
+
+.tooltip {
+    position: relative;
+    display: inline-block;
+    border-bottom: 1px dotted #ff8c00;
+    color: #ff8c00;
+}
+
+.tooltip .tooltiptext {
+    visibility: hidden;
+    width: max-content;
+    background-color: black;
+    /*border: solid 1px #ff8c00;*/
+    /*color: #ff8c00;*/
+    color: #fff;
+    text-align: center;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    position: absolute;
+    z-index: 1;
+}
+
+.tooltip:hover .tooltiptext {
+    visibility: visible;
+}
