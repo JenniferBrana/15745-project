@@ -66,6 +66,16 @@ div.lastupdated { font-size: 12px; }
   font-size: 1.5rem;
 }
 
+a {
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.custom-link {
+  text-decoration: none;
+  font-weight: 600;
+}
+
 .tooltip:hover .tooltiptext {
     visibility: visible;
 }
