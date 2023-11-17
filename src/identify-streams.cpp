@@ -3,6 +3,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/Pass.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/PassRegistry.h"
@@ -11,46 +12,23 @@
 
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/IVUsers.h"
-#include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/Analysis/LoopInfo.h"
-#include "llvm/Analysis/LoopPass.h"
-#include "llvm/Analysis/MemorySSA.h"
-#include "llvm/Analysis/MemorySSAUpdater.h"
-#include "llvm/Analysis/ScalarEvolution.h"
-#include "llvm/Analysis/ScalarEvolutionExpressions.h"
-#include "llvm/Analysis/ScalarEvolutionNormalization.h"
-#include "llvm/Analysis/TargetLibraryInfo.h"
-#include "llvm/Analysis/TargetTransformInfo.h"
-#include "llvm/Analysis/ValueTracking.h"
-#include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils.h"
-#include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include "llvm/Transforms/Utils/Local.h"
-#include "llvm/Transforms/Utils/LoopUtils.h"
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
-
-#define MYINITIALIZE_PASS_END(passName, arg, name, cfg, analysis)                \
-  PassInfo *PI = new PassInfo(                                                 \
-      name, arg, &passName::ID,                                                \
-      PassInfo::NormalCtor_t(callDefaultCtor<passName>), cfg, analysis);       \
-  Registry.registerPass(*PI, true);                                            \
-  return PI;                                                                   \
-  }                                                                            \
-  static llvm::once_flag Initialize##passName##PassFlag;                       \
-  void initialize##passName##Pass(PassRegistry &Registry) {                    \
-    llvm::call_once(Initialize##passName##PassFlag,                            \
-                    initialize##passName##PassOnce, std::ref(Registry));       \
-  }
 
 using namespace llvm;
 
 namespace llvm {
-    //void initializeIdentifyStreamsPass(PassRegistry& pr);
+
+    struct {
+        Value* initialValue;
+        Value* finalValue;
+        Value* stepValue;
+    } LoopStream;
 
     class IdentifyStreams : public LoopPass {
     public:
         static char ID;
-        //IdentifyStreams() : LoopPass(ID) { initializeIdentifyStreamsPass(*PassRegistry::getPassRegistry());};
         IdentifyStreams() : LoopPass(ID) {}
 
         virtual bool runOnLoop(Loop *L, LPPassManager& LPM) {
@@ -58,18 +36,6 @@ namespace llvm {
 
             IVUsers &IU = getAnalysis<IVUsersWrapperPass>().getIU();
             auto &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
-            //auto &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-            //auto &LI = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
-            //const auto &TTI = getAnalysis<TargetTransformInfoWrapperPass>().getTTI(*L->getHeader()->getParent());
-            //auto &AC = getAnalysis<AssumptionCacheTracker>().getAssumptionCache(*L->getHeader()->getParent());
-            //auto &TLI = getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(*L->getHeader()->getParent());
-            //auto *MSSAAnalysis = getAnalysisIfAvailable<MemorySSAWrapperPass>();
-            //MemorySSA *MSSA = nullptr;
-            //if (MSSAAnalysis)
-            //    MSSA = &MSSAAnalysis->getMSSA();
-
-
-            //auto SAR = getAnalysis<LoopStandardAnalysisResults>();
 
             errs() << "IND VAR: " << *L->getInductionVariable(SE) << "\n";
 
@@ -79,17 +45,34 @@ namespace llvm {
                     errs() << "AddRec scev: " << *e << "\n";
                 } else if (const SCEVAddExpr* e = dyn_cast<SCEVAddExpr>(s)) {
                     errs() << "Add scev: " << *e << "\n";
-                } else if (const SCEVAddRecExpr* e = dyn_cast<SCEVAddRecExpr>(s)) {
+                } else {
                     errs() << "Not scev: " << *u << "\n";
                 }
             }
 
-            PHINode* phi = L->getCanonicalInductionVariable();
-            if (phi) {
-                errs() << "YES PHI!!" << *phi << "\n";
-                errs() << "SCEV: " << *SE.getSCEV((Value*) phi) << "\n";
+            Loop::LoopBounds* bounds = L->getBounds(SE).getPointer();
+            if (bounds) {
+                Value& initialValue = bounds->getInitialIVValue();
+                Value& finalValue = bounds->getFinalIVValue();
+                const ICmpInst::Predicate& pred = bounds->getCanonicalPredicate();
+                Instruction& stepInst = bounds->getStepInst();
+                Value* stepValue = bounds->getStepValue();
+                Loop::LoopBounds::Direction dir = bounds->getDirection();
+                
+                errs() << "Initial: " << initialValue << "\n";
+                errs() << "Final: " << finalValue << "\n";
+                errs() << "Pred: " << pred << "\n";
+                errs() << "Step inst: " << stepInst << "\n";
+                if (stepValue) errs() << "Step value: " << *stepValue << "\n";
+                if (dir == Loop::LoopBounds::Direction::Increasing) {
+                    errs() << "Direction: increasing\n";
+                } else if (dir == Loop::LoopBounds::Direction::Decreasing) {
+                    errs() << "Direction: decreasing\n";
+                } else {
+                    errs() << "Direction: unknown\n";
+                }
             } else {
-                errs() << "NO PHI :(\n";
+                errs() << "NO BOUNDS\n";
             }
             
             BasicBlock* condBB = *(L->block_begin());
@@ -114,40 +97,17 @@ namespace llvm {
 
         virtual void getAnalysisUsage(AnalysisUsage& AU) const {
             AU.addPreservedID(LoopSimplifyID);
- 
-            //AU.addRequired<LoopInfoWrapperPass>();
-            //AU.addPreserved<LoopInfoWrapperPass>();
             AU.addRequiredID(LoopSimplifyID);
-            //AU.addRequired<DominatorTreeWrapperPass>();
-            //AU.addPreserved<DominatorTreeWrapperPass>();
             AU.addRequired<ScalarEvolutionWrapperPass>();
             AU.addPreserved<ScalarEvolutionWrapperPass>();
-            //AU.addRequired<AssumptionCacheTracker>();
-            //AU.addRequired<TargetLibraryInfoWrapperPass>();
             AU.addRequiredID(LoopSimplifyID);
             AU.addRequired<IVUsersWrapperPass>();
             AU.addPreserved<IVUsersWrapperPass>();
-            AU.addRequired<TargetTransformInfoWrapperPass>();
-            //AU.addPreserved<MemorySSAWrapperPass>();
         }
 
     private:
     };
 
     char IdentifyStreams::ID = 0;
-
-    //INITIALIZE_PASS_DEPENDENCY(LoopRotatePass);
-    //INITIALIZE_PASS_DEPENDENCY(IndVarSimplifyPass);
-
-    //
-    /*INITIALIZE_PASS_BEGIN(IdentifyStreams, "identify-streams", "Identify Streams", false, false)
-    //INITIALIZE_PASS_DEPENDENCY(TargetTransformInfoWrapperPass)
-    //INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass)
-    INITIALIZE_PASS_DEPENDENCY(ScalarEvolutionWrapperPass)
-    INITIALIZE_PASS_DEPENDENCY(IVUsersWrapperPass)
-    INITIALIZE_PASS_DEPENDENCY(LoopInfoWrapperPass)
-    INITIALIZE_PASS_DEPENDENCY(LoopSimplify)
-
-    MYINITIALIZE_PASS_END(IdentifyStreams, "identify-streams", "Identify Streams", false, false)*/
     RegisterPass<IdentifyStreams> X("identify-streams", "Identify Streams");
 }
