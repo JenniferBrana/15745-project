@@ -2,6 +2,8 @@
 // Group: Colin McDonald, Jennifer Brana
 ////////////////////////////////////////////////////////////////////////////////
 
+#include <stdlib.h>
+//#include <vector.h>
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Pass.h"
@@ -18,6 +20,38 @@
 using namespace llvm;
 
 namespace llvm {
+
+    bool uses_indvar(PHINode* indvar, Instruction* i) {
+        if (i == NULL) {
+            return false;
+        } else if (i == (Instruction*) indvar) {
+            return true;
+        } else {
+            for (Value* v : i->operand_values()) {
+                if (uses_indvar(indvar, dyn_cast<Instruction>(v))) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    std::vector<Value*> collectStreams(PHINode* indvar, Loop* L) {
+        std::vector<Value*> streams = std::vector<Value*>();
+        for (Loop::block_iterator bi = L->block_begin(), be = L->block_end(); bi != be; ++bi) {
+            BasicBlock* b = *bi;
+            for (Instruction &i : *b) {
+                if (LoadInst* li = dyn_cast<LoadInst>(&i)) {
+                    errs() << "Load " << *li << "\n";
+                    if (uses_indvar(indvar, li)) {
+                        errs() << "Uses indvar!\n";
+                        streams.push_back(li);
+                    }
+                }
+            }
+        }
+        return streams;
+    }
 
     class IdentifyStreams : public LoopPass {
     public:
@@ -63,13 +97,7 @@ namespace llvm {
                 errs() << "NO BOUNDS\n";
             }
             
-            for (Loop::block_iterator bi = L->block_begin(), be = L->block_end(); bi != be; ++bi) {
-                BasicBlock* b = *bi;
-                for (Instruction &i : *b) {
-                    
-                }
-                errs() << *b << "\n";
-            }
+            collectStreams(indvar, L);
             
             return true;
         }
