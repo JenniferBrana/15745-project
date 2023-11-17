@@ -14,6 +14,5 @@ int main() {
         acc += j * 3;
     }
     
-
     return acc + j;
 }

@@ -9,7 +9,6 @@
 #include "llvm/PassRegistry.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/InitializePasses.h"
-
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/IVUsers.h"
 #include "llvm/Analysis/LoopInfo.h"
@@ -20,41 +19,30 @@ using namespace llvm;
 
 namespace llvm {
 
-    struct {
-        Value* initialValue;
-        Value* finalValue;
-        Value* stepValue;
-    } LoopStream;
-
     class IdentifyStreams : public LoopPass {
     public:
         static char ID;
         IdentifyStreams() : LoopPass(ID) {}
 
         virtual bool runOnLoop(Loop *L, LPPassManager& LPM) {
+            errs() << "--------------------------------------------------\n";
             errs() << "Loop: " << *L << "\n";
 
-            IVUsers &IU = getAnalysis<IVUsersWrapperPass>().getIU();
             auto &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
 
-            errs() << "IND VAR: " << *L->getInductionVariable(SE) << "\n";
+            PHINode* indvar = L->getInductionVariable(SE);
 
-            for (IVStrideUse &u : IU) {
-                const SCEV* s = IU.getStride(u, L);
-                if (const SCEVAddRecExpr* e = dyn_cast<SCEVAddRecExpr>(s)) {
-                    errs() << "AddRec scev: " << *e << "\n";
-                } else if (const SCEVAddExpr* e = dyn_cast<SCEVAddExpr>(s)) {
-                    errs() << "Add scev: " << *e << "\n";
-                } else {
-                    errs() << "Not scev: " << *u << "\n";
-                }
-            }
+            /*for (User* u : indvar->users()) {
+                errs() << "USER: " << *u << "\n";
+            }*/
+
+            errs() << "IND VAR: " << *indvar << "\n";
 
             Loop::LoopBounds* bounds = L->getBounds(SE).getPointer();
             if (bounds) {
                 Value& initialValue = bounds->getInitialIVValue();
                 Value& finalValue = bounds->getFinalIVValue();
-                const ICmpInst::Predicate& pred = bounds->getCanonicalPredicate();
+                const ICmpInst::Predicate& pred = bounds->getCanonicalPredicate(); // Enum
                 Instruction& stepInst = bounds->getStepInst();
                 Value* stepValue = bounds->getStepValue();
                 Loop::LoopBounds::Direction dir = bounds->getDirection();
@@ -75,15 +63,6 @@ namespace llvm {
                 errs() << "NO BOUNDS\n";
             }
             
-            BasicBlock* condBB = *(L->block_begin());
-            PHINode* indvar;
-            PHINode* redvar;
-            for (Instruction &i : *condBB) {
-                if (PHINode* phi = dyn_cast<PHINode>(&i)) {
-                    
-                }
-            }
-
             for (Loop::block_iterator bi = L->block_begin(), be = L->block_end(); bi != be; ++bi) {
                 BasicBlock* b = *bi;
                 for (Instruction &i : *b) {
@@ -101,8 +80,6 @@ namespace llvm {
             AU.addRequired<ScalarEvolutionWrapperPass>();
             AU.addPreserved<ScalarEvolutionWrapperPass>();
             AU.addRequiredID(LoopSimplifyID);
-            AU.addRequired<IVUsersWrapperPass>();
-            AU.addPreserved<IVUsersWrapperPass>();
         }
 
     private:
