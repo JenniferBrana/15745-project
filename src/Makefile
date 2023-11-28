@@ -23,6 +23,6 @@ clean:
 	opt -mem2reg -loop-rotate $@.no-m2r -o $@
 	rm $@.no-m2r
 
-test-identify-streams: identify-streams.so ../tests/test2.bc
+test-identify-streams: identify-streams.so ../tests/test3.bc
 	@echo "========== Identify Streams =========="
-	@opt -enable-new-pm=0 -load ./identify-streams.so -identify-streams ../tests/test2.bc -o /dev/null
+	@opt -enable-new-pm=0 -load ./identify-streams.so -identify-streams ../tests/test3.bc -o /dev/null
