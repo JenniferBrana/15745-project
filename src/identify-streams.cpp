@@ -2,7 +2,8 @@
 // Group: Colin McDonald, Jennifer Brana
 ////////////////////////////////////////////////////////////////////////////////
 
-#include <stdlib.h>
+//#include <stdlib.h>
+#include <cstdlib>
 #include <stack>
 //#include <vector.h>
 #include "llvm/IR/Function.h"
@@ -18,6 +19,8 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
+
+#include "loop-exposed-vars.h"
 
 using namespace llvm;
 
@@ -111,6 +114,40 @@ namespace llvm {
         return NULL;
     }
 
+    // Determines the upwards-exposed "free" variables in a loop
+    std::set<Instruction*> loopFreeVars(Loop* L) {
+        std::vector<Value*> downwardsExposed;
+        std::vector<Value*> upwardsExposed;
+        llvm::loopExposedVars(L, downwardsExposed, upwardsExposed);
+        for (Value* v : downwardsExposed) {
+            errs() << "Downwards exposed: " << *v << "\n";
+        }
+        for (Value* v : upwardsExposed) {
+            errs() << "Upwards exposed: " << *v << "\n";
+        }
+        
+        std::set<Instruction*> tmp;
+        // TODO
+        return tmp;
+        // Need to compute upwards- and downwards-exposed vars
+        /*std::set<Instruction*> defset;
+        std::set<Instruction*> useset;
+        for (Loop::block_iterator bi = L->block_begin(), be = L->block_end(); bi != be; ++bi) {
+            BasicBlock* B = *bi;
+            for (Instruction &I : *B) {
+                defset.insert(&I);
+                for (Value* v : I.operand_values()) {
+                    if (Instruction* i = dyn_cast<Instruction>(v)) {
+                        useset.insert(i);
+                    }
+                }
+            }
+        }*/
+        // Calculate set difference: useset \ defset
+        //for (Instruction* I : defset) { useset.erase(I); }
+        //return useset;
+    }
+
     void getIndRedVars(Loop* L, std::vector<PHINode*>& inds, std::vector<PHINode*>& reds) {
         std::vector<PHINode*> recPHIs = std::vector<PHINode*>();
         BasicBlock* body = getBody(L);
@@ -118,18 +155,12 @@ namespace llvm {
         for (Instruction& I : *body) {
             bodyLastInstr = &I;
             if (PHINode* phi = dyn_cast<PHINode>(&I)) {
-                if (isRecDefined(phi)) { // phi->isUsedOutsideOfBlock(body) && 
+                // phi->isUsedOutsideOfBlock(body)
+                // ^^^ not useful, because the phi is used by another
+                // instruction used outside the block, but is not itself
+                // used outside the block
+                if (isRecDefined(phi)) {
                     recPHIs.push_back(phi);
-                    errs() << "For PHI " << *phi << ":\n";
-                    for (Value* v : phi->operand_values()) {
-                        if (Instruction* i = dyn_cast<Instruction>(v)) {
-                            if (i->isUsedOutsideOfBlock(body)) {
-                                errs() << "Used for " << *i << "\n";
-                            } else {
-                                errs() << "Not used outside of block: " << *i << "\n";
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -146,21 +177,41 @@ namespace llvm {
     }
 
     bool pointerChaseLoop(Loop* L) {
-        errs() << "NO IND VAR\n";
         std::vector<PHINode*> inds = std::vector<PHINode*>();
         std::vector<PHINode*> reds = std::vector<PHINode*>();
         getIndRedVars(L, inds, reds);
-        for (PHINode* phi : inds) {
-            errs() << "Found ind var: " << *phi << "\n";
-        }
-        for (PHINode* phi : reds) {
-            errs() << "Found red var: " << *phi << "\n";
+        if (inds.size() > 0 && reds.size() > 0) {
+            for (PHINode* phi : inds) {
+                errs() << "Found ind var: " << *phi << "\n";
+            }
+            for (PHINode* phi : reds) {
+                errs() << "Found red var: " << *phi << "\n";
+            }
+
+            for (Instruction* i : loopFreeVars(L)) {
+                errs() << "FV: " << *i << "\n";
+            }
+        } else {
+            errs() << "Not a pointer-chasing reduction loop\n";
         }
         return false;
     }
 
     bool affineLoop(Loop* L, PHINode* indvar, ScalarEvolution& SE) {
         errs() << "IND VAR: " << *indvar << "\n";
+        
+        std::vector<PHINode*> inds;
+        std::vector<PHINode*> reds;
+        getIndRedVars(L, inds, reds);
+        // TODO: this misidentifies the ind var as a red var
+        if (reds.size() > 0) {
+            for (PHINode* phi : inds) {
+                errs() << "Found ind var: " << *phi << "\n";
+            }
+            for (PHINode* phi : reds) {
+                errs() << "Found red var: " << *phi << "\n";
+            }
+        }
 
         Loop::LoopBounds* bounds = L->getBounds(SE).getPointer();
         if (bounds) {
@@ -214,11 +265,6 @@ namespace llvm {
 
             InductionDescriptor inddesc;
             L->getInductionDescriptor(SE, inddesc);
-            errs() << "Induction descriptor kind = " << inddesc.getKind() << "\n";
-
-            /*for (User* u : indvar->users()) {
-                errs() << "USER: " << *u << "\n";
-            }*/
 
             if (!indvar) {
                 return pointerChaseLoop(L);
