@@ -245,7 +245,8 @@ namespace llvm {
             loopFun->replaceUsesOfWith(v, loadValue);
         }
         inplaceBuilder.CreateBr(exitBlock);
-        loopBody->replaceSuccessorsPhiUsesWith(offloadInitBlock);
+        exitBlock->replacePhiUsesWith(exitBlock->getSinglePredecessor(), offloadInitBlock);
+        //loopBody->replaceSuccessorsPhiUsesWith(offloadInitBlock);
         errs() << "Offload block: " << *offloadInitBlock << "\n";
     }
 
@@ -261,6 +262,7 @@ namespace llvm {
                 errs() << "Found red var: " << *phi << "\n";
             }
             offloadToEngine(L);
+            return true;
         } else {
             errs() << "Not a pointer-chasing reduction loop\n";
         }
