@@ -27,6 +27,40 @@ using namespace llvm;
 
 namespace llvm {
 
+    BasicBlock* getLoopBody(Loop* L) {
+        return *L->block_begin();
+    }
+    
+    // Get the loop entry block
+    BasicBlock* getLoopEntry(Loop* L) {
+        BasicBlock* pred = L->getLoopPredecessor();
+        if (!pred) { return nullptr; }
+        BasicBlock* entry = nullptr;
+        
+        for (Loop::block_iterator bi = L->block_begin(), be = L->block_end(); bi != be; ++bi) {
+            BasicBlock *B = *bi;
+            for (BasicBlock *pred : predecessors(B)) {
+                if (!L->contains(pred)) {
+                    if (entry != nullptr && entry != B) {
+                        return nullptr; // more than one entry!?
+                    } else {
+                        entry = B;
+                    }
+                }
+            }
+        }
+
+        return entry;
+    }
+
+    Function* getLoopFunction(Loop* L) {
+        return getLoopBody(L)->getParent();
+    }
+
+    Module* getLoopModule(Loop* L) {
+        return getLoopFunction(L)->getParent();
+    }
+
     DenseMap<Value*, unsigned int> domainMap;
     std::vector<Value*> domainVec;
     unsigned int domainSize;
@@ -110,10 +144,6 @@ namespace llvm {
             if (b[i]) compacted.push_back(domainVec[i]);
         }
     }
-    
-    BasicBlock* loopEntryBlock(Loop* L) {
-        return *L->block_begin();
-    }
 
     void loopExitBlocks(Loop* L, std::vector<BasicBlock*>& blocks) {
         for (Loop::block_iterator bi = L->block_begin(), be = L->block_end(); bi != be; ++bi) {
@@ -155,11 +185,11 @@ namespace llvm {
     void loopExposedVars(Loop* L,
                          std::vector<Value*>& downwardsExposed,
                          std::vector<Value*>& upwardsExposed) {
-        // Loop entry block
-        BasicBlock* entry = loopEntryBlock(L);
+        // Loop body block
+        BasicBlock* body = getLoopBody(L);
 
         // Get the function in which L occurs
-        Function* F = entry->getParent();
+        Function* F = body->getParent();
         
         // Blocks that exit the loop
         //std::vector<BasicBlock*> exitingBlocks;
@@ -179,7 +209,7 @@ namespace llvm {
                                  &dataflow_meet_union);
         DenseMap<BasicBlock*, BlockState*> result = llvm::analyze(fw, F);
 
-        BlockState entryState = *result[entry];
+        BlockState bodyState = *result[body];
         
         // Meet all exiting blocks
         BitVector downwardsExposedBV = BitVector(domainSize);
@@ -194,7 +224,7 @@ namespace llvm {
         
         downwardsExposedBV &= inLoop;
 
-        BitVector upwardsExposedBV = *entryState.out;
+        BitVector upwardsExposedBV = *bodyState.out;
         upwardsExposedBV &= outLoop;
 
         compactDomainValues(downwardsExposedBV, downwardsExposed);

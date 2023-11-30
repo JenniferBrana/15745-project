@@ -14,6 +14,14 @@
 using namespace llvm;
 
 namespace llvm {
+
+    
+    BasicBlock* getLoopBody(Loop* L);
+    BasicBlock* getLoopEntry(Loop* L);
+    Function*   getLoopFunction(Loop* L);
+    Module*     getLoopModule(Loop* L);
+    void loopExitBlocks(Loop* L, std::vector<BasicBlock*>& blocks);
+
     // Returns tuple (downwardsExposed, upwardsExposed)
     // Each value being either an Instruction or an Argument
     void loopExposedVars(Loop* L,

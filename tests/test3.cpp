@@ -11,6 +11,7 @@ typedef struct LList LList;
 LList* cons(int value, LList* next) {
     LList* l = new LList;//(LList*) malloc(sizeof(LList));
     l->value = value;
+    l->next = next;
     return l;
 }
 
