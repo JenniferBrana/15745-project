@@ -13,7 +13,7 @@ objects/%.so: objects/%.o objects/dataflow.o objects/loop-exposed-vars.o
 	$(CXX) -dylib -shared $^ -o $@
 
 clean:
-	rm -f objects/*.o *~ obects/*.so out ../tests/*.ll ../tests/*.bc
+	rm -f objects/*.o *~ obects/*.so out tests/*.ll tests/*.bc
 
 .PHONY: clean all test-identify-streams
 
