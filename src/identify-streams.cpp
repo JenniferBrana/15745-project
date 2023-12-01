@@ -85,9 +85,9 @@ namespace llvm {
             BasicBlock* b = *bi;
             for (Instruction &i : *b) {
                 if (LoadInst* li = dyn_cast<LoadInst>(&i)) {
-                    errs() << "Load " << *li << "\n";
+                    //errs() << "Load " << *li << "\n";
                     if (uses_instr(indvar, li)) {
-                        errs() << "Uses indvar!\n";
+                        //errs() << "Uses indvar!\n";
                         streams.push_back(li);
                     }
                 }
@@ -101,10 +101,10 @@ namespace llvm {
         for (Instruction& I : *B) {
             bool a = uses_instr_operands(&I, &I);
             bool b = uses_instr(load, &I);
-            errs() << I << ": uses itself = " << a << "\n";
-            errs() << I << ": uses indvar = " << b << "\n";
+            //errs() << I << ": uses itself = " << a << "\n";
+            //errs() << I << ": uses indvar = " << b << "\n";
             if (a && b) {
-                errs() << "This is a reduction! " << I << "\n";
+                //errs() << "This is a reduction! " << I << "\n";
                 return true;
             }
         }
@@ -182,9 +182,9 @@ namespace llvm {
         BasicBlock* loopBody = getLoopBody(L);
         BasicBlock* loopEntry = getLoopEntry(L);
         BasicBlock* loopPred = L->getLoopPredecessor();
-        errs() << "Loop body: " << *loopBody << "\n";
-        errs() << "Loop entry: " << *loopEntry << "\n";
-        errs() << "Loop pred: " << *loopPred << "\n";
+        //errs() << "Loop body: " << *loopBody << "\n";
+        //errs() << "Loop entry: " << *loopEntry << "\n";
+        //errs() << "Loop pred: " << *loopPred << "\n";
 
         std::vector<BasicBlock*> loopBlocks = getLoopBlocks(L);
         LLVMContext& ctxt = loopFun->getContext();
@@ -194,9 +194,9 @@ namespace llvm {
         loopExitBlocks(L, exits);
         BasicBlock* loopExit = exits[0];
 
-        errs() << "Loop exit: " << *loopExit << "\n";
+        //errs() << "Loop exit: " << *loopExit << "\n";
 
-        errs() << "Original function: " << *loopFun << "\n";
+        //errs() << "Original function: " << *loopFun << "\n";
 
         // Blocks inside the loop that exit
         std::vector<BasicBlock*> loopExitings;
@@ -220,8 +220,8 @@ namespace llvm {
         ArrayRef<Type*> dataTpArray = ArrayRef<Type*>(exposedTp);
         StructType* dataStruct = StructType::create(ctxt, dataTpArray);
             
-        for (Value* v : downwardsExposed) { errs() << "down-exposed: " << *v << "\n"; }
-        for (Value* v : upwardsExposed) { errs() << "  up-exposed: " << *v << "\n"; }
+        //for (Value* v : downwardsExposed) { errs() << "down-exposed: " << *v << "\n"; }
+        //for (Value* v : upwardsExposed) { errs() << "  up-exposed: " << *v << "\n"; }
         
         // Create engine function, to which we will offload the loop
         Type* voidTy = Type::getVoidTy(ctxt);
@@ -324,9 +324,11 @@ namespace llvm {
         }
         //loopExit->replacePhiUsesWith(loopExit->getSinglePredecessor(), offloadBlock);
         //loopBody->replaceSuccessorsPhiUsesWith(offloadBlock);
-        errs() << "Offload block: " << *offloadBlock << "\n";
-        errs() << "Generated function: " << *engFunc << "\n";
-        errs() << "Updated function: " << *loopFun << "\n";
+        //errs() << "Offload block: " << *offloadBlock << "\n";
+        //errs() << "Generated function: " << *engFunc << "\n";
+        //errs() << "Updated function: " << *loopFun << "\n";
+
+        errs() << "Offloaded loop in function " << loopFun->getName() << "\n";
     }
 
 
@@ -334,37 +336,21 @@ namespace llvm {
         std::vector<PHINode*> inds = std::vector<PHINode*>();
         std::vector<PHINode*> reds = std::vector<PHINode*>();
         getIndRedVars(L, inds, reds);
-        if (inds.size() > 0 && reds.size() > 0) {
-            for (PHINode* phi : inds) {
-                errs() << "Found ind var: " << *phi << "\n";
-            }
-            for (PHINode* phi : reds) {
-                errs() << "Found red var: " << *phi << "\n";
-            }
-            //offloadToEngine(L);
-            return true;
-        } else {
-            errs() << "Not a pointer-chasing reduction loop\n";
-        }
-        return false;
+        return inds.size() > 0 && reds.size() > 0;
     }
 
     bool affineLoop(Loop* L, PHINode* indvar, ScalarEvolution& SE) {
         if (indvar == nullptr) { return false; }
-        errs() << "IND VAR: " << *indvar << "\n";
+        //errs() << "IND VAR: " << *indvar << "\n";
         
         std::vector<PHINode*> inds;
         std::vector<PHINode*> reds;
         getIndRedVars(L, inds, reds);
         // TODO: this misidentifies the ind var as a red var
-        if (reds.size() > 0) {
-            for (PHINode* phi : inds) {
-                errs() << "Found ind var: " << *phi << "\n";
-            }
-            for (PHINode* phi : reds) {
-                errs() << "Found red var: " << *phi << "\n";
-            }
-        }
+        /*if (reds.size() > 0) {
+            for (PHINode* phi : inds) { errs() << "Found ind var: " << *phi << "\n"; }
+            for (PHINode* phi : reds) { errs() << "Found red var: " << *phi << "\n"; }
+        }*/
 
         Loop::LoopBounds* bounds = L->getBounds(SE).getPointer();
         return bounds != nullptr && reds.size() > 0;
@@ -410,9 +396,9 @@ namespace llvm {
         std::set<BasicBlock*> doneAlready;
 
         virtual bool runOnLoop(Loop *L, LPPassManager& LPM) {
-            errs() << "--------------------------------------------------\n";
-            errs() << "Loop: " << *L << "\n";
-            errs() << "Body: " << *getLoopBody(L) << "\n";
+            //errs() << "--------------------------------------------------\n";
+            //errs() << "Loop: " << *L << "\n";
+            //errs() << "Body: " << *getLoopBody(L) << "\n";
 
             auto &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
 
@@ -425,7 +411,7 @@ namespace llvm {
             std::vector<BasicBlock*> exits;
             loopExitBlocks(L, exits);
             if (exits.size() != 1 && L->getLoopPredecessor()) {
-                errs() << "Loop doesn't have a single entry or exit\n";
+                //errs() << "Loop doesn't have a single entry or exit\n";
                 return false;
             }
 

@@ -15,22 +15,22 @@ LList* cons(int value, LList* next) {
     return l;
 }
 
-/*void unalloc(LList* todel) {
+void unalloc(LList* todel) {
     while (todel) {
         LList* tmp = todel;
         todel = todel->next;
         delete tmp;
     }
-}*/
+}
 
-/*int length1(LList* l) {
+int length1(LList* l) {
     int len = 0;
     while (l) {
         l = l->next;
         ++len;
     }
     return len;
-}*/
+}
 
 int sum(LList* l, int total) {
     // Upwards: l, total
@@ -45,17 +45,17 @@ int sum(LList* l, int total) {
     return x + total;// total;
 }
 
-/*int length2(LList* l) {
+int length2(LList* l) {
     int len = 0;
     while (l) {
         ++len;
         l = l->next;
     }
     return len;
-}*/
+}
 
 
-/*void append(LList* a, LList* b) {
+void append(LList* a, LList* b) {
     while (a->next) {
         a = a->next;
     }
@@ -69,7 +69,7 @@ LList* enumerate(int max) {
         l = cons(max, l);
     }
     return l;
-}*/
+}
 
 
 int main() {

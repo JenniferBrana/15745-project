@@ -214,7 +214,7 @@ namespace llvm {
         // Meet all exiting blocks
         BitVector downwardsExposedBV = BitVector(domainSize);
         for (BasicBlock* B : exitBlocks) {
-            errs() << "Exit block: " << *B << "\n";
+            //errs() << "Exit block: " << *B << "\n";
             downwardsExposedBV |= *result[B]->in;
         }
 
