@@ -51,7 +51,7 @@ void eng_func(void* d) {
     data->list = list;
 }
 
-extern void uli_send_req_fx_addr(int, void*, void*);
+//extern void uli_send_req_fx_addr(int, void*, void*);
 
 int foo(LList* list, int k) {
     int total = 0;

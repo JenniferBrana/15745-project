@@ -111,14 +111,6 @@ namespace llvm {
         return false;
     }
 
-    /*BasicBlock* getBody(Loop* L) {
-        for (Loop::block_iterator bi = L->block_begin(), be = L->block_end(); bi != be; ++bi) {
-            BasicBlock* B = *bi;
-            return B;
-        }
-        return NULL;
-    }*/
-
     void getIndRedVars(Loop* L, std::vector<PHINode*>& inds, std::vector<PHINode*>& reds) {
         std::vector<PHINode*> recPHIs = std::vector<PHINode*>();
         BasicBlock* body = getLoopBody(L);
@@ -153,18 +145,64 @@ namespace llvm {
         }
     }
 
+    Function* getULIfunction(Module* mod) {
+        Type* int64ty = Type::getInt64Ty(mod->getContext());
+        Type* voidTy = Type::getVoidTy(mod->getContext());
+        Type *voidPtrTy = llvm::PointerType::getUnqual(voidTy);
+
+        std::vector<Type*> params = {int64ty, voidPtrTy, voidPtrTy};
+        FunctionType* funTy = FunctionType::get(int64ty, ArrayRef<Type*>(params), false);
+
+        return Function::Create(funTy,
+                                Function::ExternalLinkage,
+                                "uli_send_req_fx_addr_data",
+                                mod);
+    }
+
+    void replaceBlockSuccessor(BasicBlock* B, BasicBlock* oldBlock, BasicBlock* newBlock) {
+        // Before: B -> oldBlock
+        // After:  B -> newBlock
+        Instruction* last;
+        for (Instruction &I : *B) { last = &I; }
+        last->replaceSuccessorWith(oldBlock, newBlock);
+    }
+
+    void replaceUsesOfWithInFunction(Function* F, Value* oldValue, Value* newValue) {
+        for (BasicBlock &B : *F) {
+            for (Instruction &I : B) {
+                I.replaceUsesOfWith(oldValue, newValue);
+            }
+        }
+    }
+
     void offloadToEngine(Loop* L) {
+        // Determine loop info
         Module* loopMod = getLoopModule(L);
         Function* loopFun = getLoopFunction(L);
         BasicBlock* loopBody = getLoopBody(L);
         BasicBlock* loopEntry = getLoopEntry(L);
+        BasicBlock* loopPred = L->getLoopPredecessor();
+        errs() << "Loop body: " << *loopBody << "\n";
+        errs() << "Loop entry: " << *loopEntry << "\n";
+        errs() << "Loop pred: " << *loopPred << "\n";
+
+        std::vector<BasicBlock*> loopBlocks = getLoopBlocks(L);
         LLVMContext& ctxt = loopFun->getContext();
 
         // loop must have only 1 entry and exit, to have gotten here
         std::vector<BasicBlock*> exits;
         loopExitBlocks(L, exits);
-        BasicBlock* exitBlock = exits[0];
+        BasicBlock* loopExit = exits[0];
 
+        errs() << "Loop exit: " << *loopExit << "\n";
+
+        errs() << "Original function: " << *loopFun << "\n";
+
+        // Blocks inside the loop that exit
+        std::vector<BasicBlock*> loopExitings;
+        loopExitingBlocks(L, loopExitings);
+
+        // Determine upwards- and downwards-exposed variables
         // Value* is either Instruction* or Argument*
         std::vector<Value*> downwardsExposed;
         std::vector<Value*> upwardsExposed;
@@ -178,32 +216,27 @@ namespace llvm {
         exposedTp.insert(exposedTp.end(), upwardsExposedTp.begin(), upwardsExposedTp.end());
         exposedTp.insert(exposedTp.end(), downwardsExposedTp.begin(), downwardsExposedTp.end());
 
-        //ArrayRef<Type*> inDataTpArray = ArrayRef<Type*>(upwardsExposedTp);
-        //ArrayRef<Type*> outDataTpArray = ArrayRef<Type*>(downwardsExposedTp);
+        // Make struct to store exposed vars
         ArrayRef<Type*> dataTpArray = ArrayRef<Type*>(exposedTp);
-        //StructType* inStruct = StructType::create(ctxt, inDataTpArray);//, "uli_in_data_struct");
-        //StructType* outStruct = StructType::create(ctxt, outDataTpArray);//, "uli_out_data_struct");
         StructType* dataStruct = StructType::create(ctxt, dataTpArray);
             
-        //errs() << "instruct = " << *inStruct << "\n";
-        //errs() << "outstruct = " << *outStruct << "\n";
-
         for (Value* v : downwardsExposed) { errs() << "down-exposed: " << *v << "\n"; }
         for (Value* v : upwardsExposed) { errs() << "  up-exposed: " << *v << "\n"; }
-            
+        
+        // Create engine function, to which we will offload the loop
         Type* voidTy = Type::getVoidTy(ctxt);
         Type* intTy = Type::getInt32Ty(ctxt);
         Type *voidPtrTy = llvm::PointerType::getUnqual(voidTy);
         std::vector<Type*> paramsVoidPtr = {voidPtrTy};
         FunctionType* funTy = FunctionType::get(voidTy, ArrayRef<Type*>(paramsVoidPtr), false);
         Function* engFunc = Function::Create(funTy, GlobalValue::LinkageTypes::PrivateLinkage, "identify_streams_eng_func", loopMod);
-        //engFunc->
             
         // Create block that sets up the input data struct
-        BasicBlock *offloadInitBlock = BasicBlock::Create(ctxt, "offload.init", loopFun, nullptr);
-
-        IRBuilder<> inplaceBuilder(offloadInitBlock);
+        // This replaces the loop in its original context
+        BasicBlock *offloadBlock = BasicBlock::Create(ctxt, "offload.init", loopFun, nullptr);
+        IRBuilder<> inplaceBuilder(offloadBlock);
         
+        // Store exposed variables in data struct, which is later passed to engine function
         AllocaInst* dataAlloca = inplaceBuilder.CreateAlloca(dataStruct, nullptr, "data");
         for (int i = 0; i < upwardsExposed.size(); ++i) {
             Value* v = upwardsExposed[i];
@@ -211,44 +244,91 @@ namespace llvm {
             StoreInst* storeValue = inplaceBuilder.CreateStore(v, gep);
         }
 
+        // Create ULI function call and args
         std::vector<Type*> uliFunTyArgs = {intTy, voidPtrTy, voidPtrTy};
         FunctionType* uliFunTy = FunctionType::get(voidTy, ArrayRef<Type*>(uliFunTyArgs), false);
         Value* engFuncVoidPtr = inplaceBuilder.CreatePtrToInt(engFunc, voidPtrTy, engFunc->getName() + ".voidptr");
         Value* dataVoidPtr = inplaceBuilder.CreatePtrToInt(dataAlloca, voidPtrTy, dataAlloca->getName() + ".voidptr");
         std::vector<Value*> uliArgs = {inplaceBuilder.getInt32(1), engFuncVoidPtr, dataVoidPtr};
-        CallInst* callUli = inplaceBuilder.CreateCall(uliFunTy, loopFun, ArrayRef<Value*>(uliArgs));
+        Function* uliFun = getULIfunction(loopMod);
+        CallInst* callUli = inplaceBuilder.CreateCall(uliFunTy, uliFun, ArrayRef<Value*>(uliArgs));
 
-        BasicBlock* loopPred = L->getLoopPredecessor();
-        Instruction* last;
-        for (Instruction& I : *loopPred) { last = &I; }
-        last->replaceSuccessorWith(loopEntry, offloadInitBlock);
-        
-        /* ============================== */
+        // Make predecessor to loop instead go to the 
+        replaceBlockSuccessor(loopPred, loopEntry, offloadBlock);
 
-        // Move loop to other function
+        // ================================================== //
+        // Move loop to engine function
+
+        // Create entry and exit blocks in engine function,
+        // which load and store exposed vars respectively
         BasicBlock* engFuncEntry = BasicBlock::Create(ctxt, "entry", engFunc);
-        // Only one arg, data:
+        BasicBlock* engFuncExit = BasicBlock::Create(ctxt, "exit", engFunc);
+        IRBuilder<> entryBuilder(engFuncEntry);
+        IRBuilder<> exitBuilder(engFuncExit);
+
+        // Engine function has one arg, data:
         Value* engFuncData = &*engFunc->arg_begin();
-        IRBuilder<> engFuncBuilder(engFuncEntry);
         
-        engFuncBuilder.CreateRetVoid();
+        // Load values from data struct in entry block
+        std::vector<Value*> upwardsExposedDataValues;
+        for (int i = 0; i < upwardsExposed.size(); ++i) {
+            Value* gep = entryBuilder.CreateStructGEP(dataStruct, engFuncData, i, upwardsExposed[i]->getName() + ".ptr");
+            LoadInst* dataValue = entryBuilder.CreateLoad(upwardsExposedTp[i], gep, upwardsExposed[i]->getName() + ".in");
+            upwardsExposedDataValues.push_back(dataValue);
+        }
+        // Now jump to loop entry
+        entryBuilder.CreateBr(loopEntry);
+        // And replace phi node operand labels with
+        // the new predecessor block (engFuncEntry)
+        loopEntry->replacePhiUsesWith(loopPred, engFuncEntry);
 
-        /* ============================== */
+        // Move loop to engFunc
+        for (BasicBlock* B : loopBlocks) {
+            B->moveBefore(engFuncExit);
+            replaceBlockSuccessor(B, loopExit, engFuncExit);
+        }
+        
+        // Store updated exposed vars into data struct in exit block
+        for (int i = 0; i < downwardsExposed.size(); ++i) {
+            Value* v = downwardsExposed[i];
+            Value* gep = exitBuilder.CreateStructGEP(dataStruct, engFuncData, upwardsExposed.size() + i, v->getName() + ".ptr");
+            StoreInst* storeValue = exitBuilder.CreateStore(v, gep);
+        }
+        // Engine function has void return
+        exitBuilder.CreateRetVoid();
 
-        // TODO: move loop blocks
+        // Replace original exposed vars with new vars loaded from data struct
+        for (int i = 0; i < upwardsExposed.size(); ++i) {
+            replaceUsesOfWithInFunction(engFunc, upwardsExposed[i], upwardsExposedDataValues[i]);
+            //engFunc->replaceUsesOfWith(upwardsExposed[i], upwardsExposedDataValues[i]);
+        }
 
-        // After moving the loop to engFun, now we can do this:
+        // TODO: may need to also move exit block to engine function? Not sure...
+
+        // ================================================== //
+        // Back where the loop was originally:
+        // Load updated values from data struct
         for (int i = 0; i < downwardsExposed.size(); ++i) {
             Value* v = downwardsExposed[i];
             Value* gep = inplaceBuilder.CreateStructGEP(dataStruct, dataAlloca, i + upwardsExposed.size(), v->getName() + ".ptr");
             LoadInst* loadValue = inplaceBuilder.CreateLoad(downwardsExposedTp[i], gep, v->getName() + ".out");
-            loopFun->replaceUsesOfWith(v, loadValue);
+            
+            // For some reason, loopFun->replaceUsesOfWith(v, loadValue) doesn't work...
+            replaceUsesOfWithInFunction(loopFun, v, loadValue);
         }
-        inplaceBuilder.CreateBr(exitBlock);
-        exitBlock->replacePhiUsesWith(exitBlock->getSinglePredecessor(), offloadInitBlock);
-        //loopBody->replaceSuccessorsPhiUsesWith(offloadInitBlock);
-        errs() << "Offload block: " << *offloadInitBlock << "\n";
+        // Jump where the loop exits to
+        inplaceBuilder.CreateBr(loopExit);
+        // Replace phi labels
+        for (BasicBlock* B : loopExitings) {
+            loopExit->replacePhiUsesWith(B, offloadBlock);
+        }
+        //loopExit->replacePhiUsesWith(loopExit->getSinglePredecessor(), offloadBlock);
+        //loopBody->replaceSuccessorsPhiUsesWith(offloadBlock);
+        errs() << "Offload block: " << *offloadBlock << "\n";
+        errs() << "Generated function: " << *engFunc << "\n";
+        errs() << "Updated function: " << *loopFun << "\n";
     }
+
 
     bool pointerChaseLoop(Loop* L) {
         std::vector<PHINode*> inds = std::vector<PHINode*>();
@@ -261,7 +341,7 @@ namespace llvm {
             for (PHINode* phi : reds) {
                 errs() << "Found red var: " << *phi << "\n";
             }
-            offloadToEngine(L);
+            //offloadToEngine(L);
             return true;
         } else {
             errs() << "Not a pointer-chasing reduction loop\n";
@@ -270,6 +350,7 @@ namespace llvm {
     }
 
     bool affineLoop(Loop* L, PHINode* indvar, ScalarEvolution& SE) {
+        if (indvar == nullptr) { return false; }
         errs() << "IND VAR: " << *indvar << "\n";
         
         std::vector<PHINode*> inds;
@@ -286,7 +367,8 @@ namespace llvm {
         }
 
         Loop::LoopBounds* bounds = L->getBounds(SE).getPointer();
-        if (bounds) {
+        return bounds != nullptr && reds.size() > 0;
+        /*if (bounds) {
             Value& initialValue = bounds->getInitialIVValue();
             Value& finalValue = bounds->getFinalIVValue();
             const ICmpInst::Predicate& pred = bounds->getCanonicalPredicate(); // Enum
@@ -318,13 +400,14 @@ namespace llvm {
             bool is_reduction = body && findReductionVar(getLoopBody(L), load);
         }
 
-        return true;
+        return true;*/
     }
 
     class IdentifyStreams : public LoopPass {
     public:
         static char ID;
         IdentifyStreams() : LoopPass(ID) {}
+        std::set<BasicBlock*> doneAlready;
 
         virtual bool runOnLoop(Loop *L, LPPassManager& LPM) {
             errs() << "--------------------------------------------------\n";
@@ -346,11 +429,14 @@ namespace llvm {
                 return false;
             }
 
-            if (!indvar) {
-                return pointerChaseLoop(L);
-            } else {
-                return affineLoop(L, indvar, SE);
+            BasicBlock* body = getLoopBody(L);
+            if ((pointerChaseLoop(L) || affineLoop(L, indvar, SE)) && doneAlready.count(body) == 0) {
+                doneAlready.insert(body);
+                offloadToEngine(L);
+                return true;
             }
+
+            return false;
         }
 
         virtual void getAnalysisUsage(AnalysisUsage& AU) const {

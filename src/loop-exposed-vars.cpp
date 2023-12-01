@@ -27,6 +27,14 @@ using namespace llvm;
 
 namespace llvm {
 
+    std::vector<BasicBlock*> getLoopBlocks(Loop* L) {
+        std::vector<BasicBlock*> blocks;
+        for (Loop::block_iterator bi = L->block_begin(), be = L->block_end(); bi != be; ++bi) {
+            blocks.push_back(*bi);
+        }
+        return blocks;
+    }
+
     BasicBlock* getLoopBody(Loop* L) {
         return *L->block_begin();
     }
@@ -108,14 +116,6 @@ namespace llvm {
             }
         }
     }
-
-    /*std::vector<BasicBlock*> loopBlocks(Loop* L) {
-        std::vector<BasicBlock*> blocks;
-        for (Loop::block_iterator bi = L->block_begin(), be = L->block_end(); bi != be; ++bi) {
-            blocks.push_back(*bi);
-        }
-        return blocks;
-    }*/
 
     void transferUpward(BitVector &in, BasicBlock* block) {
         for (BasicBlock::reverse_iterator rit = block->rbegin(), rend = block->rend(); rit != rend; ++rit) {
