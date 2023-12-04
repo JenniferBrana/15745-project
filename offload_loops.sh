@@ -9,4 +9,4 @@ EXE_FP=${INP_NAME}_opt
 
 opt -enable-new-pm=0 -load "${THIS_FP}/src/identify-streams.so" -identify-streams "$1" -o "$OPT_FP"
 llc -O0 -filetype=obj -march=riscv64 "$OPT_FP" -o "$OUT_FP"
-clang -static --target=riscv64 -march=rv64gc -std=c++11 -O0 -lpthread -latomic "$OUT_FP" -o "$EXE_FP" ./src/uli.h ./src/trampoline.S
+clang -static --target=riscv64 -march=rv64gc -std=c++11 -O0 -lpthread -latomic "$OUT_FP" ./src/uli.h ./src/trampoline.S -o "$EXE_FP"
