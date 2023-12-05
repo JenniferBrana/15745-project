@@ -86,7 +86,7 @@ inline void uli_init()
 
 // Set ULI handler
 
-inline void uil_set_handler(void* addr)
+inline void uli_set_handler(void* addr)
 {
   __asm__ volatile ("csrw %0, %1;"
                     :

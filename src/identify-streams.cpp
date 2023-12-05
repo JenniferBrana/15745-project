@@ -193,7 +193,6 @@ namespace llvm {
         IRBuilder<> builder(newEntry);
         CallInst* callMainStart = builder.CreateCall(mainStartFunc->getFunctionType(), mainStartFunc, ArrayRef<Value*>());
         builder.CreateBr(oldEntry);
-        errs() << "New entry: " << *newEntry << "\n";
     }
 
     void replaceBlockSuccessor(BasicBlock* B, BasicBlock* oldBlock, BasicBlock* newBlock) {

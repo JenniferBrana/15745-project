@@ -23,6 +23,8 @@ clang++ --target=riscv64 -march=rv64gc -std=c++11 -Xclang -disable-O0-optnone -f
 
 riscv64-unknown-linux-gnu-g++ "$OUT_FP" "${THIS_FP}/objects/trampoline.o" "${THIS_FP}/objects/handler.o" -lpthread -latomic -O0 -static -o "$EXE_FP"
 
+#~/riscv-gnu-toolchain/RISCV/bin/qemu-riscv64 ./linkedlist_opt
+
 # -L/usr/lib/x86_64-linux-gnu -lpthread -latomic
 #clang++ -v -static --target=riscv64 -march=rv64gc -std=c++11 -O0 -Wl,--whole-archive -lpthread -latomic -Wl,--no-whole-archive -L/usr/lib/x86_64-linux-gnu "$OUT_FP" "${THIS_FP}/objects/uli.o" "${THIS_FP}/objects/trampoline.o" -o "$EXE_FP"
 
