@@ -8,20 +8,23 @@ OPT_FP=${INP_NAME}_opt.bc
 OUT_FP_S=${INP_NAME}_opt.S
 OUT_FP=${INP_NAME}_opt.o
 EXE_FP=${INP_NAME}_opt
+#LIBS=-I/usr/include/c++/11/ -L/usr/include/ -L/usr/include/x86_64-linux-gnu/c++/11/
+#LIBS=-L/usr/lib/x86_64-linux-gnu -L/usr/
 #CLANG_FLAGS=-static --target=riscv64 -march=rv64gc -std=c++11 -stdlib=libc++ -Xclang -disable-O0-optnone -fno-discard-value-names -O0 -emit-llvm -I/usr/include/c++/11/ -I/usr/include/x86_64-linux-gnu/c++/11/ -I/usr/include/
 
 cd "$THIS_FP"
 make
 cd "$ORIG_FP"
 
-echo opt -mem2reg -loop-rotate -enable-new-pm=0 -load "${THIS_FP}/objects/identify-streams.so" -identify-streams "$1" -o "$OPT_FP"
+#echo opt -mem2reg -loop-rotate -enable-new-pm=0 -load "${THIS_FP}/objects/identify-streams.so" -identify-streams "$1" -o "$OPT_FP"
 opt -mem2reg -loop-rotate -enable-new-pm=0 -load "${THIS_FP}/objects/identify-streams.so" -identify-streams "$1" -o "$OPT_FP"
 
 llc -O0 -filetype=asm -march=riscv64 "$OPT_FP" -o "$OUT_FP_S"
 
-clang++ --target=riscv64 -march=rv64gc -std=c++11 -Xclang -disable-O0-optnone -fno-discard-value-names -O0 "$OUT_FP_S" -c -o "$OUT_FP"
+clang++ --target=riscv64 -march=rv64gc -std=c++11 -Xclang -disable-O0-optnone -fno-discard-value-names -pthread -O0 "$OUT_FP_S" -c -o "$OUT_FP"
 
-riscv64-unknown-linux-gnu-g++ "$OUT_FP" "${THIS_FP}/uli/trampoline.S" "${THIS_FP}/objects/handler.o" -std=c++11 -Wl,--whole-archive -lpthread -latomic -Wl,--no-whole-archive -O0 -static -o "$EXE_FP"
+riscv64-unknown-linux-gnu-g++ -pthread "$OUT_FP" "${THIS_FP}/objects/handler.o" "${THIS_FP}/uli/trampoline.S" -std=c++11 -Wl,--whole-archive -lpthread -latomic -Wl,--no-whole-archive -O0 -static -o "$EXE_FP"
+#clang++ --target=riscv64 -march=rv64gc $LIBS -stdlib=libc++ -pthread "$OUT_FP" "${THIS_FP}/uli/trampoline.S" "${THIS_FP}/objects/handler.o" -std=c++11 -Wl,--whole-archive -lpthread -latomic -Wl,--no-whole-archive -O0 -static -o "$EXE_FP"
 
 #~/riscv-gnu-toolchain/RISCV/bin/qemu-riscv64 ./linkedlist_opt
 

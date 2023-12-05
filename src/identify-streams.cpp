@@ -16,6 +16,7 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/PassRegistry.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Analysis/AssumptionCache.h"
@@ -170,7 +171,7 @@ namespace llvm {
     
     Function* getMainStartFunction(Module* mod) {
         if (!mainStartFunction) {
-            FunctionType* funTy = FunctionType::get(Type::getVoidTy(mod->getContext()),
+            FunctionType* funTy = FunctionType::get(Type::getInt64Ty(mod->getContext()),
                                                     ArrayRef<Type*>(), false);
             mainStartFunction = Function::Create(funTy,
                                                  linkage,
@@ -180,6 +181,31 @@ namespace llvm {
         return mainStartFunction;
     }
 
+    /*Function* mainEndFunction = NULL;
+    
+    Function* getMainEndFunction(Module* mod) {
+        if (!mainStartFunction) {
+            FunctionType* funTy = FunctionType::get(Type::getVoidTy(mod->getContext()),
+                                                    ArrayRef<Type*>(Type::getInt64Ty(mod->getContext())), false);
+            mainStartFunction = Function::Create(funTy,
+                                                 linkage,
+                                                 "main_end",
+                                                 mod);
+        }
+        return mainStartFunction;
+    }*/
+
+    /*void modifyReturningBlocks(Function* fun, Function* endFunc) {
+        for (BasicBlock& B : *fun) {
+            Instruction* I = NULL;
+            // Get last instruction
+            for (Instruction& I2 : B) { I = I2; }
+            if (ReturnInst* ri = dyn_cast<ReturnInst>(I)) {
+                ri->insertBefore(CallInst::Create(endFunc, 
+            }
+        }
+    }*/
+
     void modifyMain(Module* mod) {
         /*Function* last = NULL;
         for (Function& F : mod->functions()) {
@@ -188,6 +214,7 @@ namespace llvm {
         errs() << "Last function = " << last->getName() << "\n";*/
         Function* mainFunc = mod->getFunction("main");
         Function* mainStartFunc = getMainStartFunction(mod);
+        //Function* mainEndFunc = getMainEndFunction(mod);
         BasicBlock* oldEntry = &mainFunc->getEntryBlock();
         BasicBlock* newEntry = BasicBlock::Create(mod->getContext(), "newEntry", mainFunc, oldEntry);
         IRBuilder<> builder(newEntry);
@@ -372,6 +399,7 @@ namespace llvm {
         std::vector<PHINode*> inds = std::vector<PHINode*>();
         std::vector<PHINode*> reds = std::vector<PHINode*>();
         getIndRedVars(L, inds, reds);
+        //L->get
         return inds.size() > 0 && reds.size() > 0;
     }
 
@@ -425,6 +453,34 @@ namespace llvm {
         return true;*/
     }
 
+    bool singleEntryExit(Loop* L) {
+        // Can only offload if there is a single entry and exit
+        std::vector<BasicBlock*> exits;
+        loopExitBlocks(L, exits);
+        return exits.size() == 1 && L->getLoopPredecessor();
+    }
+
+    bool shouldOffload(Loop* L, ScalarEvolution& SE) {
+        Function* fun = getLoopFunction(L);
+        const StringRef fname = fun->getName();
+        if (!singleEntryExit(L)) {
+            return false;
+        }
+        if (pointerChaseLoop(L)) {
+            errs() << "Offload pointer-chasing reduction loop in function " << fname << "\n";
+            return true;
+        }
+        
+        PHINode* indvar = L->getInductionVariable(SE);
+        //InductionDescriptor inddesc;
+        //L->getInductionDescriptor(SE, inddesc);
+        if (affineLoop(L, indvar, SE)) {
+            errs() << "Offload affine reduction loop in function " << fname << "\n";
+            return true;
+        }
+        return false;
+    }
+
     class IdentifyStreams : public LoopPass {
     public:
         static char ID;
@@ -432,31 +488,11 @@ namespace llvm {
         std::set<BasicBlock*> doneAlready;
 
         virtual bool runOnLoop(Loop *L, LPPassManager& LPM) {
-            //errs() << "--------------------------------------------------\n";
-            //errs() << "Loop: " << *L << "\n";
-            //errs() << "Body: " << *getLoopBody(L) << "\n";
-
-            auto &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
-
-            PHINode* indvar = L->getInductionVariable(SE);
-
-            InductionDescriptor inddesc;
-            L->getInductionDescriptor(SE, inddesc);
-
-            // Can only offload if there is a single entry and exit
-            std::vector<BasicBlock*> exits;
-            loopExitBlocks(L, exits);
-            if (exits.size() != 1 && L->getLoopPredecessor()) {
-                //errs() << "Loop doesn't have a single entry or exit\n";
-                return false;
-            }
-
+            ScalarEvolution &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
             BasicBlock* body = getLoopBody(L);
-            if ((pointerChaseLoop(L) || affineLoop(L, indvar, SE)) && doneAlready.count(body) == 0) {                
+            if (!doneAlready.count(body) && shouldOffload(L, SE)) {
                 // If this is the first offload, insert pthread stuff into the main function
-                if (doneAlready.size() == 0) {
-                    modifyMain(getLoopModule(L));
-                }
+                if (doneAlready.size() == 0) { modifyMain(getLoopModule(L)); }
                 doneAlready.insert(body);
                 offloadToEngine(L);
                 return true;

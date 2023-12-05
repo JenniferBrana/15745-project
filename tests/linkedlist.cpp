@@ -1,7 +1,5 @@
 #include <cstdlib>
 #include <stdio.h>
-#include <string.h>
-//#include <iostream>
 
 template<class T>
 class LList{	
@@ -169,7 +167,7 @@ int sum(LList<int> l) {
     return total;
 }
 
-int sum2(int argc, char* argv[]) {
+/*int sum2(int argc, char* argv[]) {
     int total = 0;
     for (int i = 0; i < argc; ++i) {
         total += strlen(argv[i]);
@@ -181,12 +179,9 @@ void test() {
     for (int i = 0; i < 10; i++) {
         printf("%d\n", i);
     }
-}
-
-
+}*/
 
 int main(int argc, char* argv[]) {
-    printf("Starting original main function\n");
     LList<int> nums = LList<int>();
     int remaining = argc;
     while (remaining > 0) {
@@ -194,6 +189,6 @@ int main(int argc, char* argv[]) {
         --remaining;
     }
     printf("List of numbers 1 .. %d sums to %d\n", argc, sum(nums));
-    printf("Sum of argv lengths = %d\n", sum2(argc, argv));
+    //printf("Sum of argv lengths = %d\n", sum2(argc, argv));
     return 0;
 }
