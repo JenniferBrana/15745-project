@@ -8,7 +8,7 @@ CXXFLAGS = -rdynamic $(shell llvm-config --cxxflags) -g -O0 -fPIC
 CLANG_FLAGS = -static --target=riscv64 -march=rv64gc -std=c++11 -stdlib=libc++ -Xclang -disable-O0-optnone -fno-discard-value-names -O0 -emit-llvm $(LIB_FLAGS)
 
 
-all: $(OBJ)/identify-streams.so $(OBJ)/uli.o $(OBJ)/trampoline.o $(OBJ)/handler.o
+all: $(OBJ)/identify-streams.so $(OBJ)/handler.o
 
 #$(OBJ)/loop-exposed-vars.o
 $(OBJ)/identify-streams.o: $(SRC)/identify-streams.cpp
@@ -21,14 +21,14 @@ $(OBJ)/loop-exposed-vars.o: $(SRC)/loop-exposed-vars.cpp
 $(OBJ)/dataflow.o: $(SRC)/dataflow.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $^ -c -o $@
 
-$(OBJ)/uli.o: $(ULI)/uli.cpp
-	clang++ --target=riscv64 -march=rv64gc -std=c++11 -Xclang -disable-O0-optnone -fno-discard-value-names -O0 $^ -c -o $@
+#$(OBJ)/uli.o: $(ULI)/uli.cpp
+#	clang++ --target=riscv64 -march=rv64gc -std=c++11 -Xclang -disable-O0-optnone -fno-discard-value-names -O0 $^ -c -o $@
 
 $(OBJ)/handler.o: $(ULI)/handler.cpp
 	clang++ -pthread --target=riscv64 -march=rv64gc -std=c++11 -Xclang -disable-O0-optnone -fno-discard-value-names -O0 $(LIB_FLAGS) $^ -c -o $@
 
-$(OBJ)/trampoline.o: $(ULI)/trampoline.S
-	clang++ --target=riscv64 -march=rv64gc -std=c++11 -Xclang -disable-O0-optnone -fno-discard-value-names -O0 $^ -c -o $@
+#$(OBJ)/trampoline.o: $(ULI)/trampoline.S
+#	clang++ --target=riscv64 -march=rv64gc -std=c++11 -Xclang -disable-O0-optnone -fno-discard-value-names -O0 $^ -c -o $@
 #	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $^ -c -o $@
 
 $(OBJ)/identify-streams.so: $(OBJ)/identify-streams.o $(OBJ)/dataflow.o $(OBJ)/loop-exposed-vars.o
