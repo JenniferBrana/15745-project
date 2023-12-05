@@ -134,7 +134,7 @@ inline uint64_t uli_send_req(uint64_t target)
 // blocked until a resp (or NACK) is received
 // 
 // passes address for a data item with the callback
-inline uint64_t uli_send_req_addr(uint64_t target, void* addr)
+/*inline*/ uint64_t uli_send_req_addr(uint64_t target, void* addr)
 {
   __asm__ volatile ("csrw %0, %1;" :: "i"(ULI_DATA_ADDR),  "r" ((uint64_t)addr) :);//write pointer to address
   __asm__ volatile ("csrw %0, %1;" :: "i"(ULI_FX_ADDR),  "r" (0) :); //send no as the payload

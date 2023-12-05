@@ -145,18 +145,55 @@ namespace llvm {
         }
     }
 
+    Function* uliFunction = NULL;
+
+    GlobalValue::LinkageTypes linkage = Function::ExternalLinkage;
+    
     Function* getULIfunction(Module* mod) {
-        Type* int64ty = Type::getInt64Ty(mod->getContext());
-        Type* voidTy = Type::getVoidTy(mod->getContext());
-        Type *voidPtrTy = llvm::PointerType::getUnqual(voidTy);
+        if (!uliFunction) {
+            Type* int64ty = Type::getInt64Ty(mod->getContext());
+            Type* voidTy = Type::getVoidTy(mod->getContext());
+            Type *voidPtrTy = llvm::PointerType::getUnqual(voidTy);
 
-        std::vector<Type*> params = {int64ty, voidPtrTy, voidPtrTy};
-        FunctionType* funTy = FunctionType::get(int64ty, ArrayRef<Type*>(params), false);
+            std::vector<Type*> params = {int64ty, voidPtrTy, voidPtrTy};
+            FunctionType* funTy = FunctionType::get(int64ty, ArrayRef<Type*>(params), false);
 
-        return Function::Create(funTy,
-                                Function::ExternalLinkage,
-                                "uli_send_req_fx_addr_data",
-                                mod);
+            uliFunction = Function::Create(funTy,
+                                           linkage,
+                                           "uli_send_req_fx_addr_data",
+                                           mod);
+        }
+        return uliFunction;
+    }
+
+    Function* mainStartFunction = NULL;
+    
+    Function* getMainStartFunction(Module* mod) {
+        if (!mainStartFunction) {
+            FunctionType* funTy = FunctionType::get(Type::getVoidTy(mod->getContext()),
+                                                    ArrayRef<Type*>(), false);
+            mainStartFunction = Function::Create(funTy,
+                                                 linkage,
+                                                 "main_start",
+                                                 mod);
+        }
+        return mainStartFunction;
+    }
+
+    void modifyMain(Module* mod) {
+        /*Function* last = NULL;
+        for (Function& F : mod->functions()) {
+            last = &F;
+        }
+        errs() << "Last function = " << last->getName() << "\n";*/
+        Function* mainFunc = mod->getFunction("main");
+        Function* mainStartFunc = getMainStartFunction(mod);
+        BasicBlock* oldEntry = &mainFunc->getEntryBlock();
+        BasicBlock* newEntry = BasicBlock::Create(mod->getContext(), "newEntry", mainFunc, oldEntry);
+        IRBuilder<> builder(newEntry);
+        CallInst* callMainStart = builder.CreateCall(mainStartFunc->getFunctionType(), mainStartFunc, ArrayRef<Value*>());
+        builder.CreateBr(oldEntry);
+        errs() << "New entry: " << *newEntry << "\n";
     }
 
     void replaceBlockSuccessor(BasicBlock* B, BasicBlock* oldBlock, BasicBlock* newBlock) {
@@ -416,7 +453,11 @@ namespace llvm {
             }
 
             BasicBlock* body = getLoopBody(L);
-            if ((pointerChaseLoop(L) || affineLoop(L, indvar, SE)) && doneAlready.count(body) == 0) {
+            if ((pointerChaseLoop(L) || affineLoop(L, indvar, SE)) && doneAlready.count(body) == 0) {                
+                // If this is the first offload, insert pthread stuff into the main function
+                if (doneAlready.size() == 0) {
+                    modifyMain(getLoopModule(L));
+                }
                 doneAlready.insert(body);
                 offloadToEngine(L);
                 return true;

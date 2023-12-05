@@ -32,17 +32,13 @@ int length1(LList* l) {
     return len;
 }
 
-int sum(LList* l, int total) {
-    // Upwards: l, total
-    // Downwards: x, total
-    int x;
-    //int total = 0;
+int sum(LList* l) {
+    int total = 0;
     while (l) {
-        x = 5 + total;
         total += l->value;
         l = l->next;
     }
-    return x + total;// total;
+    return total;
 }
 
 int length2(LList* l) {
@@ -79,5 +75,5 @@ int main() {
     //for (int i = 0; i < 10; ++i) {
     //    j += 2*i + 3;
     //}
-    return 0;
+    return sum(enumerate(5));
 }
