@@ -21,7 +21,7 @@ llc -O0 -filetype=asm -march=riscv64 "$OPT_FP" -o "$OUT_FP_S"
 
 clang++ --target=riscv64 -march=rv64gc -std=c++11 -Xclang -disable-O0-optnone -fno-discard-value-names -O0 "$OUT_FP_S" -c -o "$OUT_FP"
 
-riscv64-unknown-linux-gnu-g++ "$OUT_FP" "${THIS_FP}/uli/trampoline.S" "${THIS_FP}/objects/handler.o" -lpthread -latomic -O0 -static -o "$EXE_FP"
+riscv64-unknown-linux-gnu-g++ "$OUT_FP" "${THIS_FP}/uli/trampoline.S" "${THIS_FP}/objects/handler.o" -std=c++11 -Wl,--whole-archive -lpthread -latomic -Wl,--no-whole-archive -O0 -static -o "$EXE_FP"
 
 #~/riscv-gnu-toolchain/RISCV/bin/qemu-riscv64 ./linkedlist_opt
 

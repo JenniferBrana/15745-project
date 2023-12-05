@@ -2,6 +2,7 @@
 #define ULI_H
 
 #include <stdint.h>
+#include <stdio.h>
 
 constexpr uint64_t ULI_FX_ADDR      = 0x82E; // CSR_VALUE14
 constexpr uint64_t ULI_DATA_ADDR      = 0x82F; // CSR_VALUE15
@@ -70,17 +71,27 @@ inline void uli_init()
 {
     // Enable global UIE bit in the mstatus
     uint64_t status, deleg;
+    printf("Line %d\n", 1);
     __asm__ volatile ("csrr %0, %1;" : "=r"(status) : "i"(CSR_MSTATUS) :);
+    printf("Line %d\n", 2);
     status |= (1 << CSR_MSTATUS_BIT_UIE);
+    printf("Line %d\n", 3);
     __asm__ volatile ("csrw %0, %1;" :: "i"(CSR_MSTATUS), "r"(status) :);
+    printf("Line %d\n", 4);
     // Set USI bit in sideleg and mideleg
     // to delegate ULI handling to the user mode.
     __asm__ volatile ("csrr %0, %1;" : "=r"(deleg) : "i"(CSR_SIDELEG) :);
+    printf("Line %d\n", 5);
     deleg |= (1 << CSR_MIDELEG_BIT_USI);
+    printf("Line %d\n", 6);
     __asm__ volatile ("csrw %0, %1;" :: "i"(CSR_SIDELEG), "r"(deleg) :);
+    printf("Line %d\n", 7);
     __asm__ volatile ("csrr %0, %1;" : "=r"(deleg) : "i"(CSR_MIDELEG) :);
+    printf("Line %d\n", 8);
     deleg |= (1 << CSR_SIDELEG_BIT_USI);
+    printf("Line %d\n", 9);
     __asm__ volatile ("csrw %0, %1;" :: "i"(CSR_MIDELEG), "r"(deleg) :);
+    printf("Line %d\n", 10);
 }
 
 
