@@ -24,8 +24,11 @@ $(OBJ)/dataflow.o: $(SRC)/dataflow.cpp
 $(OBJ)/uli.o: $(ULI)/uli.cpp
 	clang++ --target=riscv64 -march=rv64gc -std=c++11 -Xclang -disable-O0-optnone -fno-discard-value-names -O0 $^ -c -o $@
 
-$(OBJ)/handler.o: $(ULI)/handler.cpp
-	clang++ -pthread --target=riscv64 -march=rv64gc -std=c++11 -Xclang -disable-O0-optnone -fno-discard-value-names -O0 $(LIB_FLAGS) $^ -c -o $@
+$(OBJ)/handler.bc: $(ULI)/handler.cpp
+	clang++ -pthread --target=riscv64 -march=rv64gc -std=c++11 -Xclang -disable-O0-optnone -fno-discard-value-names -O0 $(LIB_FLAGS) -emit-llvm $^ -c -o $@
+
+$(OBJ)/handler.o: $(OBJ)/handerl.bc
+	
 
 $(OBJ)/trampoline.o: $(ULI)/trampoline.S
 	clang++ --target=riscv64 -march=rv64gc -std=c++11 -Xclang -disable-O0-optnone -fno-discard-value-names -O0 $^ -c -o $@

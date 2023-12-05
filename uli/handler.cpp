@@ -11,11 +11,13 @@
 
 typedef void (*FunctionPtr)(int* val);
 
-volatile int handlerFuncIncomplete = 1;
-std::atomic<int> threadUninitialized(1); // a global barrier
+//volatile int handlerFuncIncomplete = 1;
+//std::atomic<int> threadUninitialized(1); // a global barrier
 
 extern "C" {
 
+    volatile int handlerFuncIncomplete = 1;
+    volatile int threadUninitialized = 1;
 
     void handler_trampoline(); // call into assembly trampoline
 
@@ -49,14 +51,13 @@ extern "C" {
 
         return NULL;
     }
+    
     void main_start() {
         pthread_t thread;
         pthread_create(&thread, NULL, thread_func, NULL);
         while (threadUninitialized); // wait thread 1 to finish setup
         //return &thread;
     }
-
-
 }
 
 
