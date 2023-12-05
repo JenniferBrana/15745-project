@@ -390,8 +390,6 @@ namespace llvm {
         //errs() << "Offload block: " << *offloadBlock << "\n";
         //errs() << "Generated function: " << *engFunc << "\n";
         //errs() << "Updated function: " << *loopFun << "\n";
-
-        errs() << "Offloaded loop in function " << loopFun->getName() << "\n";
     }
 
 
