@@ -228,7 +228,7 @@ inline uint64_t uli_send_req_fx_addr(uint64_t target, void* addr)
   return val;
 }
 
-/*inline*/ uint64_t uli_send_req_fx_addr_data(uint64_t target, void* addr, void* dataAddr)
+inline uint64_t uli_send_req_fx_addr_data(uint64_t target, void* addr, void* dataAddr)
 {
   __asm__ volatile ("csrw %0, %1;" :: "i"(ULI_FX_ADDR),  "r" ((uint64_t)addr) :);//write pointer to fx address
   __asm__ volatile ("csrw %0, %1;" :: "i"(ULI_DATA_ADDR),  "r" ((uint64_t)dataAddr) :); //write pointer to data address

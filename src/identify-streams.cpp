@@ -160,7 +160,7 @@ namespace llvm {
 
             uliFunction = Function::Create(funTy,
                                            linkage,
-                                           "uli_send_req_fx_addr_data",
+                                           "send_request_uli",
                                            mod);
         }
         return uliFunction;
