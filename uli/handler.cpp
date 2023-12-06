@@ -14,6 +14,7 @@
 typedef void (*FunctionPtr)(int* val);
 
 volatile int handlerFuncIncomplete = 1;
+volatile bool firstReq = true;
 volatile int threadUninitialized = 1; // a global barrier
 
 
@@ -24,6 +25,11 @@ extern "C" {
 
     uint64_t send_request_uli(uint64_t target, void* addr, void* dataAddr) {
         //printf("send_request_uli(%llu, %lu, %lu)\n", (unsigned long long) target, (unsigned long) addr, (unsigned long) dataAddr);
+        if (firstReq) {
+            firstReq = false;
+        } else {
+            handlerFuncIncomplete += 1;
+        }
         return uli_send_req_fx_addr_data(target, addr, dataAddr);
     }
 
