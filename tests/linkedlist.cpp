@@ -173,13 +173,21 @@ int sum(LList<int> l) {
         total += strlen(argv[i]);
     }
     return total;
-}
+}*/
 
 void test() {
     for (int i = 0; i < 10; i++) {
         printf("%d\n", i);
     }
-}*/
+}
+
+int another() {
+    int total = 0;
+    for (int i = 0; i < 15; i++) {
+        total += i;
+    }
+    return total;
+}
 
 int main(int argc, char* argv[]) {
     LList<int> nums = LList<int>();

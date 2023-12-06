@@ -24,12 +24,14 @@ $(OBJ)/loop-exposed-vars.o: $(SRC)/loop-exposed-vars.cpp
 $(OBJ)/dataflow.o: $(SRC)/dataflow.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $^ -c -o $@
 
+$(OBJ)/offload.o: $(SRC)/offload.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $^ -c -o $@
 
 $(OBJ)/handler.o: $(ULI)/handler.cpp
 	clang++ -pthread --target=riscv64 -march=rv64gc -std=c++11 -Xclang -disable-O0-optnone -fno-discard-value-names -O0 $(LIB_FLAGS) $^ -c -o $@
 
 
-$(OBJ)/identify-streams.so: $(OBJ)/identify-streams.o $(OBJ)/dataflow.o $(OBJ)/loop-exposed-vars.o
+$(OBJ)/identify-streams.so: $(OBJ)/identify-streams.o $(OBJ)/dataflow.o $(OBJ)/loop-exposed-vars.o $(OBJ)/offload.o
 	$(CXX) -dylib -shared $^ -o $@
 
 tests: $(ALL_TESTS_BC)
