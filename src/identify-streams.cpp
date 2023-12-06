@@ -191,10 +191,11 @@ namespace llvm {
     }
 
     bool shouldOffload(Loop* L, ScalarEvolution& SE) {
+        // Must be outermost loop
+        if (L->getLoopDepth() > 1) { return false; }
+
         // Loop must have single entry and exit
-        if (!singleEntryExit(L)) {
-            return false;
-        }
+        if (!singleEntryExit(L)) { return false; }
         
         std::vector<PHINode*> inds;
         std::vector<PHINode*> reds;
