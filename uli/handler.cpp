@@ -14,7 +14,7 @@
 typedef void (*FunctionPtr)(int* val);
 
 volatile int handlerFuncIncomplete = 1;
-volatile bool firstReq = true;
+//volatile bool firstReq = true;
 volatile int threadUninitialized = 1; // a global barrier
 
 
@@ -76,7 +76,7 @@ extern "C" {
         return NULL;
     }
     
-    /*unsigned long*/ void main_start() {
+    unsigned long main_start() {
 
         //printf("main_start called!\n");
         pthread_t thread;
@@ -92,12 +92,12 @@ extern "C" {
         }
         //printf("thread initialized!\n");
         //printf("Thread id = %lu\n", (unsigned long) thread);
-        //return thread;
+        return thread;
     }
 
     void main_end(unsigned long thread) {
         handlerFuncIncomplete--;
-       //pthread_join(thread, NULL);
+        pthread_join(thread, NULL);
     }
 }
 

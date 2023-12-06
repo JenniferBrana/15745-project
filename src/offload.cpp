@@ -62,31 +62,31 @@ namespace llvm {
         return mainStartFunction;
     }
 
-
-    /*Function* mainEndFunction = NULL;
+    Function* mainEndFunction = NULL;
     
     Function* getMainEndFunction(Module* mod) {
-        if (!mainStartFunction) {
+        if (!mainEndFunction) {
             FunctionType* funTy = FunctionType::get(Type::getVoidTy(mod->getContext()),
                                                     ArrayRef<Type*>(Type::getInt64Ty(mod->getContext())), false);
-            mainStartFunction = Function::Create(funTy,
+            mainEndFunction = Function::Create(funTy,
                                                  linkage,
                                                  "main_end",
                                                  mod);
         }
-        return mainStartFunction;
-    }*/
+        return mainEndFunction;
+    }
 
-    /*void modifyReturningBlocks(Function* fun, Function* endFunc) {
+    void modifyReturningBlocks(Function* fun, Function* endFunc, Value* thread_id) {
         for (BasicBlock& B : *fun) {
             Instruction* I = NULL;
             // Get last instruction
-            for (Instruction& I2 : B) { I = I2; }
+            for (Instruction& I2 : B) { I = &I2; }
             if (ReturnInst* ri = dyn_cast<ReturnInst>(I)) {
-                ri->insertBefore(CallInst::Create(endFunc, 
+                CallInst::Create(endFunc, ArrayRef<Value*>(thread_id), "", ri);
+                //ri->insertBefore();
             }
         }
-    }*/
+    }
 
     void modifyMain(Module* mod) {
         /*Function* last = NULL;
@@ -96,12 +96,13 @@ namespace llvm {
         errs() << "Last function = " << last->getName() << "\n";*/
         Function* mainFunc = mod->getFunction("main");
         Function* mainStartFunc = getMainStartFunction(mod);
-        //Function* mainEndFunc = getMainEndFunction(mod);
+        Function* mainEndFunc = getMainEndFunction(mod);
         BasicBlock* oldEntry = &mainFunc->getEntryBlock();
         BasicBlock* newEntry = BasicBlock::Create(mod->getContext(), "newEntry", mainFunc, oldEntry);
         IRBuilder<> builder(newEntry);
         CallInst* callMainStart = builder.CreateCall(mainStartFunc->getFunctionType(), mainStartFunc, ArrayRef<Value*>());
         builder.CreateBr(oldEntry);
+        modifyReturningBlocks(mainFunc, mainEndFunc, callMainStart);
     }
 
     void offloadToEngine(Loop* L) {
