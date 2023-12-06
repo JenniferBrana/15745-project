@@ -25,11 +25,11 @@ extern "C" {
 
     uint64_t send_request_uli(uint64_t target, void* addr, void* dataAddr) {
         //printf("send_request_uli(%llu, %lu, %lu)\n", (unsigned long long) target, (unsigned long) addr, (unsigned long) dataAddr);
-        if (firstReq) {
-            firstReq = false;
-        } else {
-            handlerFuncIncomplete += 1;
-        }
+        // if (firstReq) {
+        //     firstReq = false;
+        // } else {
+        //     handlerFuncIncomplete += 1;
+        // }
         return uli_send_req_fx_addr_data(target, addr, dataAddr);
     }
 
@@ -46,7 +46,7 @@ extern "C" {
         //printf("about to call %lu with %lu\n", (unsigned long) &funcPtr, (unsigned long) ptr);
         funcPtr(ptr); //call the passed function
 
-        handlerFuncIncomplete--;
+        // handlerFuncIncomplete--;
         uli_send_resp(2);
     }
 
@@ -95,9 +95,10 @@ extern "C" {
         //return thread;
     }
 
-    //void main_end(unsigned long thread) {
-    //    pthread_join(thread, NULL);
-    //}
+    void main_end(unsigned long thread) {
+        handlerFuncIncomplete--;
+       //pthread_join(thread, NULL);
+    }
 }
 
 
