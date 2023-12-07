@@ -11,7 +11,7 @@ CXXFLAGS = -rdynamic $(shell llvm-config --cxxflags) -g -O0 -fPIC
 CLANG_FLAGS = -static --target=riscv64 -march=rv64gc -std=c++11 -stdlib=libc++ -Xclang -disable-O0-optnone -fno-discard-value-names -O0 -emit-llvm $(LIB_FLAGS)
 
 
-all: $(OBJ)/identify-streams.so $(OBJ)/handler.o tests
+all: $(OBJ)/identify-streams.so $(OBJ)/handler.o
 
 #$(OBJ)/loop-exposed-vars.o
 $(OBJ)/identify-streams.o: $(SRC)/identify-streams.cpp
